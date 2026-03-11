@@ -8,8 +8,6 @@ import logging
 import os
 import sys
 
-from .browser import login_and_get_key, signup
-from .email_reader import wait_for_verification_email
 from .env_writer import write_to_env
 from .registry import list_services, load_service, search_services
 
@@ -20,6 +18,12 @@ def main() -> None:
         description="AI agent that signs up for services and gets your API keys.",
     )
     sub = parser.add_subparsers(dest="command")
+
+    # --- setup ---
+    setup_parser = sub.add_parser("setup", help="Configure LLM API key (first-time setup)")
+    setup_parser.add_argument(
+        "--force", action="store_true", help="Reconfigure even if already set"
+    )
 
     # --- get ---
     get_parser = sub.add_parser("get", help="Sign up and get an API key")
@@ -42,6 +46,12 @@ def main() -> None:
     )
     get_parser.add_argument("--env-file", default=".env", help="Path to .env file")
     get_parser.add_argument("--no-headless", action="store_true", help="Show browser")
+    get_parser.add_argument(
+        "--no-agent",
+        action="store_true",
+        help="Use direct Playwright (CSS selectors) instead of AI agent",
+    )
+    get_parser.add_argument("--max-steps", type=int, default=20, help="Max agent steps")
     get_parser.add_argument("--skip-email-verify", action="store_true")
     get_parser.add_argument("--imap-host", help="IMAP server for email verification")
     get_parser.add_argument("--imap-password", help="IMAP password (or app password)")
@@ -64,7 +74,9 @@ def main() -> None:
         format="%(name)s %(levelname)s %(message)s",
     )
 
-    if args.command == "list":
+    if args.command == "setup":
+        _cmd_setup(args)
+    elif args.command == "list":
         _cmd_list()
     elif args.command == "search":
         _cmd_search(args.query)
@@ -75,6 +87,15 @@ def main() -> None:
     else:
         parser.print_help()
         sys.exit(1)
+
+
+def _cmd_setup(args: argparse.Namespace) -> None:
+    from .setup import run_setup
+
+    config = run_setup(force=args.force)
+    print(f"  Ready! Using {config['name']} ({config['model']})")
+    print()
+    print("  Now try: zerostep get eia --email you@example.com --password YourPass123")
 
 
 def _cmd_list() -> None:
@@ -162,12 +183,13 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     method = args.method
+    use_agent = not args.no_agent
 
     # Resolve OAuth credentials
     oauth_email = None
     oauth_password = None
     if method == "google":
-        if not svc.supports_google:
+        if not svc.supports_google and not use_agent:
             print(f"Error: {svc.display_name} does not support Google signup")
             print("  Use --method=email or --method=github instead")
             sys.exit(1)
@@ -176,7 +198,7 @@ async def _cmd_get(args: argparse.Namespace) -> None:
             args.google_password or os.environ.get("ZEROSTEP_GOOGLE_PASSWORD") or password
         )
     elif method == "github":
-        if not svc.supports_github:
+        if not svc.supports_github and not use_agent:
             print(f"Error: {svc.display_name} does not support GitHub signup")
             print("  Use --method=email or --method=google instead")
             sys.exit(1)
@@ -189,99 +211,103 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         print(f"Warning: {svc.display_name} has CAPTCHA. Use --no-headless to solve manually.")
 
     method_label = {"email": "email+password", "google": "Google OAuth", "github": "GitHub OAuth"}
+    mode_label = "AI agent" if use_agent else "direct Playwright"
     print(f"\n  ZeroStep: Getting API key for {svc.display_name}")
     print(f"  {'─' * 40}")
     print(f"  Email:    {email_addr}")
     print(f"  Method:   {method_label[method]}")
+    print(f"  Mode:     {mode_label}")
     print(f"  Env var:  {svc.env_var}")
     print(f"  Env file: {args.env_file}")
     print()
 
-    # Step 1: Sign up
-    print(f"  [1/3] Signing up via {method_label[method]}...")
     proxy = args.proxy or os.environ.get("ZEROSTEP_PROXY")
-    result = await signup(
-        svc,
-        email=email_addr,
-        password=password,
-        name=args.name,
-        headless=not args.no_headless,
-        method=method,
-        oauth_email=oauth_email,
-        oauth_password=oauth_password,
-        proxy=proxy,
-    )
 
-    if not result["success"]:
-        print(f"  FAILED: {result['error']}")
-        sys.exit(1)
+    if use_agent:
+        # --- AI Agent mode (default) ---
+        print(f"  [1/2] AI agent signing up via {method_label[method]}...")
+        from .agent import agent_signup
 
-    # Step 2: Email verification
-    if result["needs_verification"] and not args.skip_email_verify:
-        print("  [2/3] Waiting for verification email...")
-
-        imap_host = args.imap_host or os.environ.get("ZEROSTEP_IMAP_HOST")
-        imap_pass = args.imap_password or os.environ.get("ZEROSTEP_IMAP_PASSWORD", password)
-
-        if not imap_host:
-            # Auto-detect from email domain
-            domain = email_addr.split("@")[1]
-            imap_hosts = {
-                "gmail.com": "imap.gmail.com",
-                "outlook.com": "imap-mail.outlook.com",
-                "hotmail.com": "imap-mail.outlook.com",
-                "yahoo.com": "imap.mail.yahoo.com",
-                "icloud.com": "imap.mail.me.com",
-            }
-            imap_host = imap_hosts.get(domain, f"imap.{domain}")
-
-        email_result = wait_for_verification_email(
-            imap_host=imap_host,
-            imap_user=email_addr,
-            imap_password=imap_pass,
-            timeout=120,
-        )
-
-        if email_result and email_result.get("verification_link"):
-            print("  Found verification link, clicking...")
-            # Use browser to click verification link
-            from playwright.async_api import async_playwright
-
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=not args.no_headless)
-                page = await browser.new_page()
-                await page.goto(email_result["verification_link"], timeout=30000)
-                import asyncio
-
-                await asyncio.sleep(3)
-                await browser.close()
-            print("  Email verified.")
-        else:
-            print("  Could not find verification email automatically.")
-            print("  Please verify manually, then press Enter to continue...")
-            input()
-
-        # Step 3: Log in and get API key
-        print("  [3/3] Logging in to get API key...")
-        api_key = await login_and_get_key(
+        result = await agent_signup(
             svc,
             email=email_addr,
             password=password,
+            method=method,
+            oauth_email=oauth_email,
+            oauth_password=oauth_password,
             headless=not args.no_headless,
+            proxy=proxy,
+            max_steps=args.max_steps,
         )
-    elif result["api_key"]:
-        api_key = result["api_key"]
-        print("  [2/3] No email verification needed.")
-        print("  [3/3] Got API key directly from signup.")
+
+        if not result["success"]:
+            print(f"  FAILED: {result['error']}")
+            sys.exit(1)
+
+        if result["needs_verification"]:
+            print("  [2/2] Email verification needed.")
+            _handle_email_verification(args, email_addr, password)
+            # After verification, run agent again to get the key
+            print("  Re-running agent to get API key...")
+            result = await agent_signup(
+                svc,
+                email=email_addr,
+                password=password,
+                method=method,
+                oauth_email=oauth_email,
+                oauth_password=oauth_password,
+                headless=not args.no_headless,
+                proxy=proxy,
+                max_steps=args.max_steps,
+            )
+
+        api_key = result.get("api_key")
+
     else:
-        print("  [2/3] Skipped email verification.")
-        print("  [3/3] Logging in to get API key...")
-        api_key = await login_and_get_key(
+        # --- Direct Playwright mode (--no-agent) ---
+        from .browser import login_and_get_key, signup
+
+        print(f"  [1/3] Signing up via {method_label[method]}...")
+        result = await signup(
             svc,
             email=email_addr,
             password=password,
+            name=args.name,
             headless=not args.no_headless,
+            method=method,
+            oauth_email=oauth_email,
+            oauth_password=oauth_password,
+            proxy=proxy,
         )
+
+        if not result["success"]:
+            print(f"  FAILED: {result['error']}")
+            sys.exit(1)
+
+        if result["needs_verification"] and not args.skip_email_verify:
+            print("  [2/3] Email verification needed.")
+            _handle_email_verification(args, email_addr, password)
+
+            print("  [3/3] Logging in to get API key...")
+            api_key = await login_and_get_key(
+                svc,
+                email=email_addr,
+                password=password,
+                headless=not args.no_headless,
+            )
+        elif result["api_key"]:
+            api_key = result["api_key"]
+            print("  [2/3] No email verification needed.")
+            print("  [3/3] Got API key directly from signup.")
+        else:
+            print("  [2/3] Skipped email verification.")
+            print("  [3/3] Logging in to get API key...")
+            api_key = await login_and_get_key(
+                svc,
+                email=email_addr,
+                password=password,
+                headless=not args.no_headless,
+            )
 
     if api_key:
         env_path = write_to_env(svc.env_var, api_key, args.env_file)
@@ -289,10 +315,62 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         print(f"  {svc.env_var}={api_key[:8]}...{api_key[-4:]}")
         print(f"  Written to {env_path}")
     else:
+        error_msg = result.get("error", "")
         print("\n  Signup succeeded but could not extract API key automatically.")
+        if error_msg:
+            print(f"  Detail: {error_msg[:200]}")
         print(f"  Try logging in manually at: {svc.api_key_url}")
 
     print()
+
+
+def _handle_email_verification(args: argparse.Namespace, email_addr: str, password: str) -> None:
+    """Handle email verification step."""
+    from .email_reader import wait_for_verification_email
+
+    print("  Waiting for verification email...")
+
+    imap_host = args.imap_host or os.environ.get("ZEROSTEP_IMAP_HOST")
+    imap_pass = args.imap_password or os.environ.get("ZEROSTEP_IMAP_PASSWORD", password)
+
+    if not imap_host:
+        domain = email_addr.split("@")[1]
+        imap_hosts = {
+            "gmail.com": "imap.gmail.com",
+            "outlook.com": "imap-mail.outlook.com",
+            "hotmail.com": "imap-mail.outlook.com",
+            "yahoo.com": "imap.mail.yahoo.com",
+            "icloud.com": "imap.mail.me.com",
+        }
+        imap_host = imap_hosts.get(domain, f"imap.{domain}")
+
+    email_result = wait_for_verification_email(
+        imap_host=imap_host,
+        imap_user=email_addr,
+        imap_password=imap_pass,
+        timeout=120,
+    )
+
+    if email_result and email_result.get("verification_link"):
+        print("  Found verification link, clicking...")
+        import asyncio
+
+        from playwright.async_api import async_playwright
+
+        async def _click_link() -> None:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=not args.no_headless)
+                page = await browser.new_page()
+                await page.goto(email_result["verification_link"], timeout=30000)
+                await asyncio.sleep(3)
+                await browser.close()
+
+        asyncio.get_event_loop().run_until_complete(_click_link())
+        print("  Email verified.")
+    else:
+        print("  Could not find verification email automatically.")
+        print("  Please verify manually, then press Enter to continue...")
+        input()
 
 
 if __name__ == "__main__":

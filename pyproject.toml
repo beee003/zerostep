@@ -25,6 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+agent = ["browser-use>=0.12"]
 email = ["imapclient>=2.3"]
 dev = ["pytest", "pytest-asyncio", "ruff"]
 
