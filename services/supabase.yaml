@@ -13,10 +13,9 @@ has_captcha: false
 has_phone_verification: false
 requires_credit_card: false
 
-supports_google: true
+supports_google: false
 supports_github: true
-google_button_selector: 'button:has-text("Continue with Google"), a:has-text("Google")'
-github_button_selector: 'button:has-text("Continue with GitHub"), a:has-text("GitHub")'
+github_button_selector: 'button:has-text("Continue with GitHub")'
 
 signup_email_selector: 'input[name="email"], input[type="email"]'
 signup_password_selector: 'input[name="password"], input[type="password"]'

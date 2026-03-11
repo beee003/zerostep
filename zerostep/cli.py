@@ -37,6 +37,9 @@ def main() -> None:
     get_parser.add_argument("--google-password", help="Google account password")
     get_parser.add_argument("--github-email", help="GitHub account email (if different)")
     get_parser.add_argument("--github-password", help="GitHub account password")
+    get_parser.add_argument(
+        "--proxy", help="Proxy URL (e.g. http://user:pass@host:port, socks5://host:port)"
+    )
     get_parser.add_argument("--env-file", default=".env", help="Path to .env file")
     get_parser.add_argument("--no-headless", action="store_true", help="Show browser")
     get_parser.add_argument("--skip-email-verify", action="store_true")
@@ -196,6 +199,7 @@ async def _cmd_get(args: argparse.Namespace) -> None:
 
     # Step 1: Sign up
     print(f"  [1/3] Signing up via {method_label[method]}...")
+    proxy = args.proxy or os.environ.get("ZEROSTEP_PROXY")
     result = await signup(
         svc,
         email=email_addr,
@@ -205,6 +209,7 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         method=method,
         oauth_email=oauth_email,
         oauth_password=oauth_password,
+        proxy=proxy,
     )
 
     if not result["success"]:

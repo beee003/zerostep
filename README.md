@@ -95,7 +95,10 @@ zerostep get supabase --method=github
 zerostep get posthog --method=google
 ```
 
-**Note:** Google may block automated login if you have 2FA enabled. Use `--no-headless` to complete the login manually in that case.
+**Note:** Google aggressively blocks automated browsers. Google OAuth works best with:
+- A residential proxy (`--proxy=http://user:pass@residential-proxy:port`)
+- `--no-headless` to complete the login manually if blocked
+- GitHub OAuth is more reliable for automated flows
 
 ## Email verification
 

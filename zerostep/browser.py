@@ -9,6 +9,11 @@ from typing import Any
 
 from playwright.async_api import Page, async_playwright
 
+try:
+    from playwright_stealth import stealth_async
+except ImportError:
+    stealth_async = None
+
 from .registry import ServiceConfig
 
 logger = logging.getLogger("zerostep.browser")
@@ -54,7 +59,8 @@ async def _handle_oauth_popup(
     # Google OAuth selectors
     google_email_sel = 'input[type="email"], input#identifierId'
     google_email_next = "#identifierNext, button:has-text('Next')"
-    google_pass_sel = 'input[type="password"], input[name="Passwd"]'
+    # Google hides the real password field; target the visible one by name
+    google_pass_sel = 'input[name="Passwd"], input[type="password"]:visible'
     google_pass_next = "#passwordNext, button:has-text('Next')"
 
     # GitHub OAuth selectors
@@ -73,17 +79,27 @@ async def _handle_oauth_popup(
             if not filled:
                 logger.warning("Could not find Google email field")
                 return False
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
             await _wait_and_click(oauth_page, google_email_next, timeout=5000)
-            await asyncio.sleep(2)
+            # Google takes a while to transition to password step
+            await asyncio.sleep(5)
 
-            filled = await _wait_and_fill(oauth_page, google_pass_sel, oauth_password, timeout=8000)
+            # Wait for the real password field (not the hidden decoy)
+            filled = await _wait_and_fill(
+                oauth_page, google_pass_sel, oauth_password, timeout=15000
+            )
             if not filled:
-                logger.warning("Could not find Google password field")
-                return False
-            await asyncio.sleep(0.5)
+                # Fallback: try typing into the active element
+                logger.warning("Standard fill failed, trying keyboard input")
+                try:
+                    await oauth_page.keyboard.type(oauth_password, delay=50)
+                    filled = True
+                except Exception:
+                    logger.warning("Could not find Google password field")
+                    return False
+            await asyncio.sleep(1)
             await _wait_and_click(oauth_page, google_pass_next, timeout=5000)
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
 
         elif provider == "github":
             # GitHub single page: email + password + submit
@@ -138,6 +154,7 @@ async def signup(
     method: str = "email",
     oauth_email: str | None = None,
     oauth_password: str | None = None,
+    proxy: str | None = None,
 ) -> dict[str, Any]:
     """Sign up for a service using browser automation.
 
@@ -145,6 +162,7 @@ async def signup(
         method: "email", "google", or "github"
         oauth_email: Google/GitHub email (defaults to email)
         oauth_password: Google/GitHub password (defaults to password)
+        proxy: Proxy URL (e.g. "http://user:pass@host:port" or "socks5://host:port")
 
     Returns:
         Dict with keys: success, needs_verification, api_key, error
@@ -167,18 +185,30 @@ async def signup(
     oauth_email = oauth_email or email
     oauth_password = oauth_password or password
 
+    # Build launch args
+    launch_args: dict[str, Any] = {"headless": headless}
+    if proxy:
+        # Parse proxy URL for Playwright
+        launch_args["proxy"] = {"server": proxy}
+        logger.info("Using proxy: %s", proxy.split("@")[-1] if "@" in proxy else proxy)
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
+        browser = await p.chromium.launch(**launch_args)
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
 
+        # Apply stealth mode to evade bot detection (especially for Google OAuth)
+        if stealth_async:
+            await stealth_async(page)
+            logger.info("Stealth mode applied")
+
         try:
             # Navigate to signup page
             logger.info("Navigating to %s", service.signup_url)
-            await page.goto(service.signup_url, wait_until="networkidle", timeout=30000)
+            await page.goto(service.signup_url, wait_until="domcontentloaded", timeout=60000)
             await asyncio.sleep(1)  # Let JS settle
 
             # --- OAuth signup ---
@@ -259,7 +289,7 @@ async def signup(
                 elif action == "wait":
                     await asyncio.sleep(int(value) if value else 2)
                 elif action == "goto":
-                    await page.goto(value, wait_until="networkidle", timeout=30000)
+                    await page.goto(value, wait_until="domcontentloaded", timeout=60000)
 
                 await asyncio.sleep(1)
 
@@ -289,7 +319,7 @@ async def signup(
 
             # If no key found, try navigating to API key page
             if service.api_key_url:
-                await page.goto(service.api_key_url, wait_until="networkidle", timeout=30000)
+                await page.goto(service.api_key_url, wait_until="domcontentloaded", timeout=60000)
                 await asyncio.sleep(2)
 
                 # Click "Generate" button if needed
@@ -331,7 +361,7 @@ async def login_and_get_key(
         page = await context.new_page()
 
         try:
-            await page.goto(login_url, wait_until="networkidle", timeout=30000)
+            await page.goto(login_url, wait_until="domcontentloaded", timeout=60000)
             await asyncio.sleep(1)
 
             await _wait_and_fill(page, service.login_email_selector, email)
@@ -342,7 +372,7 @@ async def login_and_get_key(
 
             # Navigate to API key page
             if service.api_key_url:
-                await page.goto(service.api_key_url, wait_until="networkidle", timeout=30000)
+                await page.goto(service.api_key_url, wait_until="domcontentloaded", timeout=60000)
                 await asyncio.sleep(2)
 
             if service.api_key_button_selector:
