@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import yaml
 
 SERVICES_DIR = Path(__file__).parent.parent / "services"
 
@@ -36,6 +37,16 @@ class ServiceConfig:
     api_key_button_selector: str | None = None  # "Generate API Key" button
     api_key_pattern: str | None = None  # Regex to extract key from page text
 
+    # OAuth signup (Google/GitHub)
+    supports_google: bool = False
+    supports_github: bool = False
+    google_button_selector: str = (
+        'button:has-text("Google"), a:has-text("Google"), [data-provider="google"]'
+    )
+    github_button_selector: str = (
+        'button:has-text("GitHub"), a:has-text("GitHub"), [data-provider="github"]'
+    )
+
     # Login (for returning to get key after email verification)
     login_url: str | None = None
     login_email_selector: str = 'input[type="email"], input[name="email"]'
@@ -62,9 +73,7 @@ def load_service(name: str) -> ServiceConfig:
                 yaml_path = f
                 break
         else:
-            raise ValueError(
-                f"Unknown service: {name}. Available: {', '.join(list_services())}"
-            )
+            raise ValueError(f"Unknown service: {name}. Available: {', '.join(list_services())}")
 
     with open(yaml_path) as f:
         data = yaml.safe_load(f)

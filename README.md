@@ -34,16 +34,22 @@ playwright install chromium
 export ZEROSTEP_EMAIL="you@example.com"
 export ZEROSTEP_PASSWORD="YourSecurePassword123!"
 
-# Get an API key
+# Get an API key (email+password signup)
 zerostep get eia
 zerostep get supabase
 zerostep get resend
 zerostep get brave
 
+# Sign up with GitHub (faster, skips email verification)
+zerostep get supabase --method=github --github-email=you@github.com --github-password=ghpass
+
+# Sign up with Google
+zerostep get posthog --method=google --google-email=you@gmail.com --google-password=gpass
+
 # List supported services
 zerostep list
 
-# Show service details
+# Show service details (including supported signup methods)
 zerostep info posthog
 
 # Watch the browser (useful for debugging or CAPTCHAs)
@@ -52,21 +58,44 @@ zerostep get openai --no-headless
 
 ## Supported services
 
-| Service | Env var | Difficulty | Free tier |
-|---------|---------|------------|-----------|
-| EIA | `EIA_API_KEY` | Easy | Unlimited (government) |
-| Supabase | `SUPABASE_KEY` | Easy | 2 projects, 500MB |
-| Resend | `RESEND_API_KEY` | Easy | 100 emails/day |
-| PostHog | `POSTHOG_API_KEY` | Easy | 1M events/month |
-| Brave Search | `BRAVE_API_KEY` | Easy | 2,000 queries/month |
-| Firecrawl | `FIRECRAWL_API_KEY` | Easy | 500 credits |
-| OpenAI | `OPENAI_API_KEY` | Medium | $5 credits (has CAPTCHA) |
-| Anthropic | `ANTHROPIC_API_KEY` | Medium | $5 credits (phone verify) |
+| Service | Env var | Difficulty | Google | GitHub | Free tier |
+|---------|---------|------------|--------|--------|-----------|
+| EIA | `EIA_API_KEY` | Easy | | | Unlimited (government) |
+| Supabase | `SUPABASE_KEY` | Easy | Y | Y | 2 projects, 500MB |
+| Resend | `RESEND_API_KEY` | Easy | | Y | 100 emails/day |
+| PostHog | `POSTHOG_API_KEY` | Easy | Y | Y | 1M events/month |
+| Brave Search | `BRAVE_API_KEY` | Easy | | | 2,000 queries/month |
+| Firecrawl | `FIRECRAWL_API_KEY` | Easy | Y | Y | 500 credits |
+| OpenAI | `OPENAI_API_KEY` | Medium | | | $5 credits (has CAPTCHA) |
+| Anthropic | `ANTHROPIC_API_KEY` | Medium | | | $5 credits (phone verify) |
+
+**Signup methods:**
+- **email** (default) — Creates a new account with email + password
+- **google** — Signs up via Google OAuth (skips email verification)
+- **github** — Signs up via GitHub OAuth (skips email verification)
 
 **Difficulty levels:**
 - **Easy** — Email + password signup, no CAPTCHA, no phone
 - **Medium** — Has CAPTCHA or phone verification (use `--no-headless` to solve manually)
 - **Hard** — Requires credit card or complex OAuth flows
+
+## OAuth signup (Google/GitHub)
+
+Many dev tools let you sign up with Google or GitHub — faster and skips email verification entirely.
+
+```bash
+# Set OAuth credentials (optional — defaults to ZEROSTEP_EMAIL/PASSWORD)
+export ZEROSTEP_GOOGLE_EMAIL="you@gmail.com"
+export ZEROSTEP_GOOGLE_PASSWORD="your-google-password"
+export ZEROSTEP_GITHUB_EMAIL="you@github.com"
+export ZEROSTEP_GITHUB_PASSWORD="your-github-password"
+
+# Use OAuth
+zerostep get supabase --method=github
+zerostep get posthog --method=google
+```
+
+**Note:** Google may block automated login if you have 2FA enabled. Use `--no-headless` to complete the login manually in that case.
 
 ## Email verification
 

@@ -8,10 +8,10 @@ import logging
 import os
 import sys
 
-from .registry import load_service, list_services, search_services
-from .browser import signup, login_and_get_key
+from .browser import login_and_get_key, signup
 from .email_reader import wait_for_verification_email
 from .env_writer import write_to_env
+from .registry import list_services, load_service, search_services
 
 
 def main() -> None:
@@ -27,6 +27,16 @@ def main() -> None:
     get_parser.add_argument("--email", help="Email to sign up with")
     get_parser.add_argument("--password", help="Password for the account")
     get_parser.add_argument("--name", help="Full name (if required)")
+    get_parser.add_argument(
+        "--method",
+        choices=["email", "google", "github"],
+        default="email",
+        help="Signup method: email (default), google, or github",
+    )
+    get_parser.add_argument("--google-email", help="Google account email (if different)")
+    get_parser.add_argument("--google-password", help="Google account password")
+    get_parser.add_argument("--github-email", help="GitHub account email (if different)")
+    get_parser.add_argument("--github-password", help="GitHub account password")
     get_parser.add_argument("--env-file", default=".env", help="Path to .env file")
     get_parser.add_argument("--no-headless", action="store_true", help="Show browser")
     get_parser.add_argument("--skip-email-verify", action="store_true")
@@ -118,6 +128,12 @@ def _cmd_info(service_name: str) -> None:
     print(f"  CAPTCHA:        {'Yes' if svc.has_captcha else 'No'}")
     print(f"  Phone verify:   {'Yes' if svc.has_phone_verification else 'No'}")
     print(f"  Credit card:    {'Yes' if svc.requires_credit_card else 'No'}")
+    methods = ["email"]
+    if svc.supports_google:
+        methods.append("google")
+    if svc.supports_github:
+        methods.append("github")
+    print(f"  Signup methods: {', '.join(methods)}")
     if svc.free_tier:
         print(f"  Free tier:      {svc.free_tier}")
     if svc.docs_url:
@@ -142,26 +158,53 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         print("Error: --password required (or set ZEROSTEP_PASSWORD)")
         sys.exit(1)
 
-    if svc.has_captcha:
-        print(
-            f"Warning: {svc.display_name} has CAPTCHA. Use --no-headless to solve manually."
+    method = args.method
+
+    # Resolve OAuth credentials
+    oauth_email = None
+    oauth_password = None
+    if method == "google":
+        if not svc.supports_google:
+            print(f"Error: {svc.display_name} does not support Google signup")
+            print("  Use --method=email or --method=github instead")
+            sys.exit(1)
+        oauth_email = args.google_email or os.environ.get("ZEROSTEP_GOOGLE_EMAIL") or email_addr
+        oauth_password = (
+            args.google_password or os.environ.get("ZEROSTEP_GOOGLE_PASSWORD") or password
+        )
+    elif method == "github":
+        if not svc.supports_github:
+            print(f"Error: {svc.display_name} does not support GitHub signup")
+            print("  Use --method=email or --method=google instead")
+            sys.exit(1)
+        oauth_email = args.github_email or os.environ.get("ZEROSTEP_GITHUB_EMAIL") or email_addr
+        oauth_password = (
+            args.github_password or os.environ.get("ZEROSTEP_GITHUB_PASSWORD") or password
         )
 
+    if svc.has_captcha:
+        print(f"Warning: {svc.display_name} has CAPTCHA. Use --no-headless to solve manually.")
+
+    method_label = {"email": "email+password", "google": "Google OAuth", "github": "GitHub OAuth"}
     print(f"\n  ZeroStep: Getting API key for {svc.display_name}")
     print(f"  {'─' * 40}")
     print(f"  Email:    {email_addr}")
+    print(f"  Method:   {method_label[method]}")
     print(f"  Env var:  {svc.env_var}")
     print(f"  Env file: {args.env_file}")
     print()
 
     # Step 1: Sign up
-    print("  [1/3] Signing up...")
+    print(f"  [1/3] Signing up via {method_label[method]}...")
     result = await signup(
         svc,
         email=email_addr,
         password=password,
         name=args.name,
         headless=not args.no_headless,
+        method=method,
+        oauth_email=oauth_email,
+        oauth_password=oauth_password,
     )
 
     if not result["success"]:
@@ -173,9 +216,7 @@ async def _cmd_get(args: argparse.Namespace) -> None:
         print("  [2/3] Waiting for verification email...")
 
         imap_host = args.imap_host or os.environ.get("ZEROSTEP_IMAP_HOST")
-        imap_pass = args.imap_password or os.environ.get(
-            "ZEROSTEP_IMAP_PASSWORD", password
-        )
+        imap_pass = args.imap_password or os.environ.get("ZEROSTEP_IMAP_PASSWORD", password)
 
         if not imap_host:
             # Auto-detect from email domain

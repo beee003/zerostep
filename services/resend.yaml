@@ -13,6 +13,10 @@ has_captcha: false
 has_phone_verification: false
 requires_credit_card: false
 
+supports_google: false
+supports_github: true
+github_button_selector: 'button:has-text("GitHub"), a:has-text("GitHub"), button:has-text("Continue with GitHub")'
+
 signup_email_selector: 'input[name="email"], input[type="email"]'
 signup_password_selector: 'input[name="password"], input[type="password"]'
 signup_submit_selector: 'button[type="submit"]'
