@@ -1,0 +1,21 @@
+name: firecrawl
+display_name: Firecrawl
+signup_url: https://firecrawl.dev/signin/signup
+api_key_url: https://firecrawl.dev/app/api-keys
+env_var: FIRECRAWL_API_KEY
+category: scraping
+difficulty: easy
+free_tier: "500 credits free"
+docs_url: https://docs.firecrawl.dev
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: false
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_selector: 'code, input[readonly]'
+api_key_pattern: 'fc-[a-zA-Z0-9_\-]{20,}'

@@ -1,0 +1,22 @@
+name: anthropic
+display_name: Anthropic
+signup_url: https://console.anthropic.com/signup
+api_key_url: https://console.anthropic.com/settings/keys
+env_var: ANTHROPIC_API_KEY
+category: ai
+difficulty: medium
+free_tier: "$5 free credits for new accounts"
+docs_url: https://docs.anthropic.com
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: true
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_button_selector: 'button:has-text("Create Key")'
+api_key_selector: 'code, input[readonly]'
+api_key_pattern: 'sk-ant-[a-zA-Z0-9_\-]{20,}'

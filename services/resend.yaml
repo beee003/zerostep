@@ -1,0 +1,22 @@
+name: resend
+display_name: Resend
+signup_url: https://resend.com/signup
+api_key_url: https://resend.com/api-keys
+env_var: RESEND_API_KEY
+category: email
+difficulty: easy
+free_tier: "100 emails/day free"
+docs_url: https://resend.com/docs
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: false
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_button_selector: 'button:has-text("Create API Key"), button:has-text("Generate")'
+api_key_selector: 'code, input[readonly]'
+api_key_pattern: 're_[a-zA-Z0-9_]{20,}'

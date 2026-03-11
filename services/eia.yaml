@@ -1,0 +1,22 @@
+name: eia
+display_name: U.S. Energy Information Administration
+signup_url: https://www.eia.gov/opendata/register.php
+api_key_url: https://www.eia.gov/opendata/register.php
+env_var: EIA_API_KEY
+category: energy
+difficulty: easy
+free_tier: "Unlimited — free government API"
+docs_url: https://www.eia.gov/opendata/documentation.php
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: false
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"]'
+signup_password_selector: 'input[name="password"]'
+signup_name_selector: 'input[name="name"]'
+signup_submit_selector: 'button[type="submit"], input[type="submit"]'
+
+api_key_selector: null
+api_key_pattern: '([a-zA-Z0-9]{32,})'

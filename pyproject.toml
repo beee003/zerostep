@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zerostep"
+version = "0.1.0"
+description = "AI agent that signs up for services and gets your API keys. 4 steps → 0."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "MayaLab"}]
+keywords = ["ai", "agent", "api-key", "browser-automation", "developer-tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "playwright>=1.40",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+email = ["imapclient>=2.3"]
+dev = ["pytest", "pytest-asyncio", "ruff"]
+
+[project.scripts]
+zerostep = "zerostep.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/beee003/zerostep"
+Repository = "https://github.com/beee003/zerostep"
+Issues = "https://github.com/beee003/zerostep/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.setuptools.packages.find]
+include = ["zerostep*"]
+
+[tool.setuptools.package-data]
+zerostep = ["../services/*.yaml"]

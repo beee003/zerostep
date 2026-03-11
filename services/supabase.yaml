@@ -1,0 +1,21 @@
+name: supabase
+display_name: Supabase
+signup_url: https://supabase.com/dashboard/sign-up
+api_key_url: https://supabase.com/dashboard/project/_/settings/api
+env_var: SUPABASE_KEY
+category: database
+difficulty: easy
+free_tier: "2 free projects, 500MB database"
+docs_url: https://supabase.com/docs
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: false
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_selector: 'input[id*="anon"], code'
+api_key_pattern: 'eyJ[a-zA-Z0-9_\-]{100,}'

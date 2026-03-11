@@ -1,0 +1,22 @@
+name: openai
+display_name: OpenAI
+signup_url: https://platform.openai.com/signup
+api_key_url: https://platform.openai.com/api-keys
+env_var: OPENAI_API_KEY
+category: ai
+difficulty: medium
+free_tier: "$5 free credits for new accounts"
+docs_url: https://platform.openai.com/docs
+
+has_email_verification: true
+has_captcha: true
+has_phone_verification: true
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_button_selector: 'button:has-text("Create new secret key")'
+api_key_selector: 'code, input[readonly]'
+api_key_pattern: 'sk-[a-zA-Z0-9_\-]{20,}'

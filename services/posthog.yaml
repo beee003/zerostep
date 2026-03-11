@@ -1,0 +1,26 @@
+name: posthog
+display_name: PostHog
+signup_url: https://app.posthog.com/signup
+api_key_url: https://app.posthog.com/project/settings
+env_var: POSTHOG_API_KEY
+category: analytics
+difficulty: easy
+free_tier: "1M events/month free"
+docs_url: https://posthog.com/docs
+
+has_email_verification: true
+has_captcha: false
+has_phone_verification: false
+requires_credit_card: false
+
+signup_email_selector: 'input[name="email"], input[type="email"]'
+signup_password_selector: 'input[name="password"], input[type="password"]'
+signup_name_selector: 'input[name="name"], input[name="first_name"]'
+signup_submit_selector: 'button[type="submit"]'
+
+api_key_selector: 'code, [data-attr="project-api-key"]'
+api_key_pattern: 'phc_[a-zA-Z0-9]{20,}'
+
+post_signup_steps:
+  - action: wait
+    value: "3"
