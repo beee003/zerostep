@@ -160,6 +160,10 @@ async def agent_signup(
     # Build LLM and browser
     llm = _build_llm(llm_config)
 
+    # Disable vision for free/open-source models (they're too slow for screenshots)
+    # Vision is only fast enough with GPT-4o, Claude, or Gemini with their own API keys
+    use_vision = llm_config["env_var"] in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY")
+
     browser_kwargs: dict[str, Any] = {
         "headless": headless,
         "chromium_sandbox": False,
@@ -172,14 +176,14 @@ async def agent_signup(
     # Build the task
     task = _build_task(service, email, password, method, oauth_email, oauth_password)
 
-    logger.info("Starting Browser Use agent for %s", service.name)
+    logger.info("Starting Browser Use agent for %s (vision=%s)", service.name, use_vision)
 
     try:
         agent = Agent(
             task=task,
             llm=llm,
             browser=browser,
-            use_vision=True,
+            use_vision=use_vision,
             max_actions_per_step=5,
             step_timeout=120,
         )

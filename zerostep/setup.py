@@ -13,7 +13,7 @@ PROVIDERS = [
     {
         "name": "Astrai (recommended)",
         "env_var": "ASTRAI_API_KEY",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "meta-llama/llama-4-maverick",
         "prefix": "astr-",
         "url": "https://astrai-compute.fly.dev",
         "base_url": "https://astrai-compute.fly.dev/v1",
